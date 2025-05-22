@@ -152,7 +152,26 @@ router.get('/user/:userId', authenticateToken, async (req, res) => {
             .find({ scenarioId: { $in: userScenarios.scenarios } })
             .toArray();
         
-        res.json(scenarios);
+        // Map database field names to client-expected field names
+        const clientScenarios = scenarios.map(scenario => ({
+            scenarioId: scenario.scenarioId,
+            moduleId: scenario.moduleId,
+            title: scenario.scenarioTitle || scenario.title,
+            description: scenario.scenarioDescription || scenario.description,
+            difficulty: scenario.difficultyLevel || scenario.difficulty,
+            duration: scenario.durationMinutes || scenario.duration,
+            requiresVoice: scenario.requiresVoice,
+            maxParticipants: scenario.maxParticipants,
+            passingScore: scenario.passingScore,
+            creatorId: scenario.creatorId,
+            organizationId: scenario.organizationId,
+            aiModelConfig: scenario.aiModelConfig,
+            feedbackType: scenario.feedbackType,
+            version: scenario.version,
+            imageUrl: scenario.imageUrl
+        }));
+        
+        res.json(clientScenarios);
     } catch (error) {
         console.error('Error getting user scenarios:', error);
         res.status(500).json({ message: 'Server error' });
