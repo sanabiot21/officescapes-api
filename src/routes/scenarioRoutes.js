@@ -301,4 +301,46 @@ router.delete('/user/:userId/:scenarioId', authenticateToken, async (req, res) =
     }
 });
 
+// Delete a scenario completely (only for organization admins)
+router.delete('/:scenarioId', authenticateToken, async (req, res) => {
+    try {
+        const db = req.app.locals.db;
+        const scenarioId = parseInt(req.params.scenarioId);
+        
+        // Get the scenario to verify organization ownership
+        const scenario = await db.collection('scenarios').findOne({ scenarioId });
+        if (!scenario) {
+            return res.status(404).json({ message: 'Scenario not found' });
+        }
+        
+        // Verify the user is from the same organization that created the scenario
+        const userId = req.user.userId;
+        const user = await db.collection('users').findOne({ userId });
+        
+        if (!user || user.userType !== 'organization' || user.organizationId !== scenario.organizationId) {
+            return res.status(403).json({ 
+                message: 'Unauthorized: Only organization admins can delete their own scenarios' 
+            });
+        }
+        
+        // Delete the scenario
+        const deleteResult = await db.collection('scenarios').deleteOne({ scenarioId });
+        
+        if (deleteResult.deletedCount === 0) {
+            return res.status(500).json({ message: 'Failed to delete scenario' });
+        }
+        
+        // Remove this scenario from all users who have it
+        await db.collection('user_scenarios').updateMany(
+            { scenarios: scenarioId },
+            { $pull: { scenarios: scenarioId } }
+        );
+        
+        res.json({ message: 'Scenario successfully deleted' });
+    } catch (error) {
+        console.error('Error deleting scenario:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router; 
